@@ -1,7 +1,7 @@
 from flask import request
 from flask_restx import Resource, Namespace
 
-from models import Movie, MovieSchema
+from models import Movie, MovieSchema, admin_required
 from setup_db import db
 
 movie_ns = Namespace('movies')
@@ -24,6 +24,7 @@ class MoviesView(Resource):
         res = MovieSchema(many=True).dump(all_movies)
         return res, 200
 
+    @admin_required
     def post(self):
         req_json = request.json
         ent = Movie(**req_json)
@@ -40,6 +41,7 @@ class MovieView(Resource):
         sm_d = MovieSchema().dump(b)
         return sm_d, 200
 
+    @admin_required
     def put(self, bid):
         movie = db.session.query(Movie).get(bid)
         req_json = request.json
@@ -54,6 +56,7 @@ class MovieView(Resource):
         db.session.commit()
         return "", 204
 
+    @admin_required
     def delete(self, bid):
         movie = db.session.query(Movie).get(bid)
 

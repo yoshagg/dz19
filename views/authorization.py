@@ -1,31 +1,71 @@
 from flask_restx import Resource, Namespace
-from flask import request
+from flask import request, abort
 
-from models import User, get_hash, generate_password
+import hashlib
+import jwt
+
+from constants import JWT_ALGORITHM as algo
+from constants import JWT_SECRET as secret
+
+from models import User, generate_tokens
 from setup_db import db
 
-authorization_ns = Namespace()
+auth_ns = Namespace()
 
 
-@authorization_ns.route('/auth')
-class AuthViews(Resource):
+@auth_ns.route('/auth')
+class AuthView(Resource):
     def post(self):
+        # TODO напишите Ваш код здесь
         req_json = request.json
-        entered_login = req_json.get('username')
-        entered_password = req_json.get('password')
-        password = generate_password(entered_password)
-        registered_accounts = User.query.get_all('username')
+        username = req_json.get("username", None)
+        password = req_json.get("password", None)
+
+        if None in [username, password]:
+            abort(400)
+
+        user = db.session.query(User).filter(User.username == username).first()
+
+        if user is None:
+            return {"error": "Неверные учётные данные"}, 401
+
+        password_hash = hashlib.md5(password.encode('utf-8')).hexdigest()
+
+        if password_hash != user.password:
+            return {"error": "Неверные учётные данные"}, 401
+
+        data = {
+            "username": user.username,
+            "role": user.role
+        }
+
+        tokens = generate_tokens(data)
+
+        return tokens, 201
+
+
+    def put(self):
+        # TODO напишите Ваш код здесь
+        req_json = request.json
+        refresh_token = req_json.get("refresh_token")
+
+        if refresh_token is None:
+            abort(400)
+
         try:
-            if entered_login in registered_accounts:
+            data = jwt.decode(jwt=refresh_token, key=secret, algorithms=[algo])
+        except:
+            abort(400)
 
+        username = data.get('username')
 
+        user = db.session.query(User).filter(User.username == username).first()
 
+        data = {
+            "username": user.username,
+            "role": user.role
+        }
 
-    def put(self, rid):
-        director = Director.query.get(rid)
-        req_json = request.json
-        director.name = req_json.get('name')
+        tokens = generate_tokens(data)
 
-        db.session.add(director)
-        db.session.commit()
-        return "", 204
+        return tokens, 201
